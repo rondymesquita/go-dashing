@@ -1,0 +1,11 @@
+//= require color-palette.scss
+
+$primary-color: #A4C639;
+// Analogous
+@include generate-color-palette($base-color: $primary-color);
+// Monochromatic
+//@include generate-color-palette($base-color: $background-color, $type: monochromatic, $class-name: 'monochrome', $darken:true, $base-factor:2.5%);
+// Triad
+// @include generate-color-palette($base-color: $background-color, $type: triad, $class-name: 'triad');
+// Cross-complementary
+@include generate-color-palette($base-color: $primary-color, $type: complementary, $class-name: 'complementary');

@@ -1,0 +1,346 @@
+// Thanks https://gist.github.com/samuel-holt/82ef9305fa4779ed4f08
+
+// =================================
+// Color palette generator
+// =================================
+
+// Muck around with colors here:
+$primary-color: salmon;
+
+// A global to store the palette(s)
+$global-color-palettes: () !global;
+
+// Declare allowed types
+// Currently limited to the types below
+$allowed-types: (analogous, monochromatic, triad, complementary);
+
+// Defaults
+$default-palette-type:      analogous !default;
+$default-base-factor:       5% !default;
+$default-number-of-colors:  5 !default;
+$default-darken:            false !default;
+$default-hover-darken:      true !default;
+$default-hover-factor:      10% !default;
+$default-text-color:        false !default;
+$default-start-index:       0 !default;
+$default-color-offset:      false !default;
+$default-class-name:        false !default;
+$default-generate-css:      true !default;
+
+// Declare default values in mixin parameters
+@mixin generate-color-palette($base-color,
+$type:              $default-palette-type,
+$base-factor:       $default-base-factor,
+$number-of-colors:  $default-number-of-colors,
+$darken:            $default-darken,
+$hover-darken:      $default-hover-darken,
+$hover-factor:      $default-hover-factor,
+$text-color:        $default-text-color,
+$start-index:       $default-start-index,
+$color-offset:      $default-color-offset,
+$class-name:        $default-class-name,
+$generate-css:      $default-generate-css) {
+
+  // Mixin begins here
+
+  @if not $base-color {
+    @error "Base color is required";
+  }
+
+  // Check for invalid type early
+  @if not index($allowed-types, $type) {
+    @error "Invalid type: #{$type}";
+  }
+
+  // restrict Triad to 3 colours
+  @if triad == $type and $number-of-colors > 3 {
+    $number-of-colors: 3;
+    $color-offset: 120deg;
+  } @else if monochromatic == $type {
+    // Set color offset to 0 for monochromatic
+    // Only lightness changes
+    $color-offset: 0deg;
+  }
+
+  @if not $color-offset {
+    @if analogous == $type {
+      $color-offset: 36deg;
+    } @else if complementary == $type {
+      // Cross-complement by default
+      $color-offset: 90deg;
+    }
+  }
+
+  // Set color limit to 4 for cross-complement
+  @if complementary == $type {
+    $number-of-colors: 4;
+  }
+
+  // Empty list to store the generated palettes
+  $color-palettes: ();
+
+  // Set the current to the base color by default
+  $current-color: $base-color;
+
+  $factor-increment: 0;
+
+  $end-index: $start-index + $number-of-colors - 1;
+
+  $previous-color: null;
+
+  $current-maps: ();
+
+  @if not $class-name {
+    $class-name: "color";
+  }
+
+  // Loop begins
+  @for $i from $start-index through $end-index {
+
+    $factor: $factor-increment * $base-factor;
+
+    // Get HSL from base color
+    $color-hue: hue($current-color);
+    $color-saturation: saturation($current-color);
+    $color-lightness: lightness($current-color);
+
+    $current-color: hsl($color-hue, $color-saturation, $color-lightness);
+    $current-map: ();
+
+    $method: lighten;
+
+    @if $darken {
+      $method: darken;
+
+      // If darken is true, lighten on hover
+      @if $hover-darken {
+        $hover-darken: false;
+      }
+    }
+
+    // Do color manipulation, skip first (base) color, cos we want that to stay the same
+    @if $i > $start-index {
+
+      @if complementary == $type {
+        // Get cross-complement
+        @if $i == 2 {
+          // For index 2, rotate color by offset (default 90deg)
+          $current-color: adjust-hue($current-color, $color-offset);
+          //          //@debug $current-color;
+        } @else {
+          // on 1 and 3 get complement
+          $current-color: complement($current-color);
+        }
+      } @else {
+        // Run given method on color
+        $current-color: call($method, adjust-hue($current-color, $color-offset), $factor);
+      }
+
+      // increment colour offset for analogous color
+      @if analogous == $type {
+        $colour-offset: $color-offset + $color-offset;
+      }
+
+      // If totally white, let's bring it back into color
+      @if lightness($current-color) == 100% {
+        $current-color: darken($current-color, $factor);
+      }
+
+    }
+
+    $index: $i + 1;
+    $contrast: contrast-color($current-color);
+
+    // If the text-color has been explicitly set, set the "contrast" value to that
+    @if false != $text-color {
+      $contrast: $text-color;
+    }
+
+    // Calculate hover and active colors:
+    $hover-color: darken($current-color, $hover-factor);
+    $active-color: darken($hover-color, $hover-factor);
+
+    @if true != $hover-darken {
+      $hover-color: lighten($current-color, $hover-factor);
+      $active-color: lighten($hover-color, $hover-factor);
+    }
+
+    $factor-increment: $factor-increment + 1;
+
+    // Generate default CSS rules
+    @if $generate-css {
+
+      .#{$class-name}-#{$index} {
+        background-color: $current-color;
+        color: $contrast;
+      }
+
+      // Links (Just change the text color)
+      .link {
+        background-color: transparent;
+        &.#{$class-name}-#{$index} {
+          color: $current-color;
+          &:hover {
+            color: $hover-color;
+          }
+          &:active {
+            color: $active-color;
+          }
+        }
+      }
+
+      // Button (change background-color)
+      // Use contrast color or user-set color for text
+      .button {
+        &.#{$class-name}-#{$index} {
+          &:hover {
+            background-color: $hover-color;
+            color: $contrast;
+          }
+
+          &:active {
+            background-color: $active-color;
+            color: $contrast;
+          }
+        }
+      }
+    }
+
+    // Store the current set of colours in a map
+    // add this current map to the maps list
+    $current-map: ($i: ($current-color, $hover-color, $active-color));
+    $current-maps: append($current-maps, $current-map);
+  }
+
+  // Append the generated maps to the color-palettes global
+  $color-palettes: append($global-color-palettes, ($class-name: $current-maps));
+  $global-color-palettes: $color-palettes !global;
+
+}
+
+// Functions
+
+// Contrast color override (for CodePen)
+$contrasted-dark-default: #000 !default;
+$contrasted-light-default: #fff !default;
+
+// It strips the unit of measure and returns it
+@function strip-unit($num) {
+  @return $num / ($num * 0 + 1);
+}
+
+@function brightness($color) {
+  @if type-of($color) == color {
+    @return (red($color) * 0.299 + green($color) * 0.587 + blue($color) * 0.114) / 255 * 100%;
+  }
+  @else {
+    @return unquote("brightness(#{$color})");
+  }
+}
+
+@function contrast-color($color, $dark: $contrasted-dark-default, $light: $contrasted-light-default) {
+  @if $color == null {
+    @return null;
+  }
+  @else {
+    $color-brightness: brightness($color);
+    $dark-text-brightness: brightness($dark);
+    $light-text-brightness: brightness($light);
+
+    // Fix CodePen :p
+
+    $light-diff: strip-unit($color-brightness) - strip-unit($light-text-brightness);
+    $dark-diff: strip-unit($color-brightness) - strip-unit($dark-text-brightness);
+
+    @return if(abs($light-diff) > abs($dark-diff), $light, $dark);
+  }
+}
+
+// Get a specific map by key
+@function get-palette-map($_key) {
+
+  $current: ();
+  // Loop through each palette and check for the map with the specified key
+  @each $palette in $global-color-palettes {
+
+    @if map-has-key($palette, $_key) {
+      $current: $palette;
+    }
+
+  }
+  // Return the map by the given key
+  @return map-get($current, $_key);
+}
+
+// Get a color list by index (1-based)
+// Returns colors in list in format: (link,hover,active)
+@function get-palette-color-list($n: 1, $_key: "color") {
+
+  $current-list: ();
+
+  // Get the map by the specified key
+  $map: get-palette-map($_key);
+
+  // Maps are 0-based
+  // Lists are 1-based
+  $index: $n - 1;
+
+  @if length($map) > 0 {
+
+    $current-map: nth($map, $n);
+
+    @if length($current-map) > 0 {
+      $current-list: map-get($current-map, $index);
+    }
+  }
+
+  @return $current-list;
+
+}
+
+// Get a single specific color in a list
+@function get-palette-color($n: 0, $key: "color") {
+  $color: null;
+
+  $palette-list: get-palette-color-list($n, $key);
+
+  @if length($palette-list) > 0 {
+    $color: nth($palette-list, 1);
+  }
+
+  @return $color;
+}
+
+// Mixin for getting buttons from a given palette
+@mixin get-palette-button($n: 0, $key: "color", $text-color: false) {
+  // Get the color list
+  $palette-list: get-palette-color-list($n, $key);
+
+  @if length($palette-list) > 0 {
+    // Get each color out of the list
+    $default-color: nth($palette-list, 1);
+    $hover-color: nth($palette-list, 2);
+    $active-color: nth($palette-list, 3);
+
+    // If the text-color is not set, get the contrast color
+    @if not $text-color {
+      $text-color: contrast-color($default-color);
+    }
+
+    // CSS rules
+    background-color: $default-color;
+    color: $text-color;
+
+    &:hover {
+      background-color: $hover-color;
+      color: $text-color;
+    }
+
+    &:active {
+      background-color: $active-color;
+      color: $text-color;
+    }
+  }
+
+
+}

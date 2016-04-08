@@ -67,7 +67,7 @@
 		{
 			"importpath": "github.com/znly/go-sprockets",
 			"repository": "https://github.com/znly/go-sprockets",
-			"revision": "e40f956583f0533443f06cf44a15c78e56630264",
+			"revision": "e22a0d723dbfffb2d91e19468b4a1978b80e8607",
 			"branch": "master"
 		},
 		{

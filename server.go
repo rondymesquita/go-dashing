@@ -261,7 +261,7 @@ func (s *server) start() error {
 }
 
 func newServer(b *broker, webroot, dashingJSRoot, defaultDashboard, authToken, host, port string) (*server, error) {
-	s, err := sprockets.NewWithDefault(webroot + "/assets")
+	s, err := sprockets.NewWithDefault(webroot+"/assets", "")
 	if err != nil {
 		return nil, err
 	}
